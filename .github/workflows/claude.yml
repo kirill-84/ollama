@@ -32,7 +32,7 @@ jobs:
 
       - name: Project Setup
         run: |
-          npm install
+          npm ci
           npm run dev
 
       - name: Run Claude Code
