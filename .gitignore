@@ -54,3 +54,4 @@ next-env.d.ts
 /prisma/dev.db-journal
 
 package-lock.json
+/app/generated/prisma
