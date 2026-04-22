@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Next.js 16 application that integrates with [Ollama](https://ollama.com/) (local LLM inference) via the `ollama` npm package. Uses App Router, React 19, Tailwind CSS v4, and TypeScript.
+Next.js 16 application that integrates with [Ollama](https://ollama.com/) (local LLM inference) via the `ollama` npm package. Uses App Router, React 19, Tailwind CSS v4, and TypeScript.\
 Создаем чат-бота поиска авиабилетов на Шри-Ланку.
 
 ## Стек
