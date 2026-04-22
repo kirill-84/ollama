@@ -53,4 +53,8 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/dev.db-journal
 
-/app/generated/prisma
+# Prisma
+app/generated/
+
+# Vitest coverage
+coverage/
