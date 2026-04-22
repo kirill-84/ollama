@@ -46,6 +46,7 @@ jobs:
       OLLAMA_MODEL: qwen3.5:cloud
       TRAVELPAYOUTS_TOKEN: mock
       TRAVELPAYOUTS_MARKER: mock
+      TRAVELPAYOUTS_MODE: mock
     
     steps:
       - name: Checkout repository
@@ -74,12 +75,17 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
           claude_args: |
-            --append-system-prompt "The project is already set up with all dependencies installed.\
-              The server is already running at localhost:3000. Logs from it are beign written to logs.txt.\
-              If needed, you can query the db with the 'psql' cli. If needed, use mcp__playwright set of tools to launch a browser and interact with the app."
+            --append-system-prompt "Read CLAUDE.md and AGENTS.md in the repo root before starting any task.\
+              Follow the conventions there strictly: SOLID, DRY, KISS, YAGNI; repository pattern; tests with every new module.\
+              The project is a Russian-language chatbot for searching cheap flights to Sri Lanka (Colombo, CMB).\
+              Stack: Next.js 15, TypeScript, Prisma 7, PostgreSQL, Tailwind v4, shadcn/ui, Ollama via ollama-js, Travelpayouts API.\
+              Dev server runs at localhost:3000. Logs in logs.txt. DB via psql with DATABASE_URL env var.\
+              External services are mocked in CI: OLLAMA_MODE=mock, TRAVELPAYOUTS_MODE=mock.\
+              Use mcp__playwright tools to verify UI changes render correctly.\
+              Work in a branch claude/issue-<num>-<slug>. Do NOT push to main directly."
             --max-turns 10
             --model claude-opus-4-7
-            --allowedTools "Bash(npm:*),Bash(psql:*),mcp__playwright__browser_navigate,mcp__playwright__browser_click,mcp__playwright__browser_wait_for,mcp__playwright__browser_resize,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_type,mcp__playwright__browser_evaluate,mcp__playwright__browser_press_key,mcp__playwright__browser_snapshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_select_option,mcp__playwright__browser_close,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_tabs"
+            --allowedTools "Bash(npm:*),Bash(npx:*),Bash(psql:*),Bash(git:*),mcp__playwright__browser_navigate,mcp__playwright__browser_click,mcp__playwright__browser_wait_for,mcp__playwright__browser_resize,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_type,mcp__playwright__browser_evaluate,mcp__playwright__browser_press_key,mcp__playwright__browser_snapshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_select_option,mcp__playwright__browser_close,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_tabs"
             --mcp-config '{"mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest","--allowed-origins","localhost:3000;cdn.tailwindcss.com;esm.sh"]}}}'
 
           # This is an optional setting that allows Claude to read CI results on PRs
