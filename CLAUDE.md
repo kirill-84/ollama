@@ -40,24 +40,24 @@ with code in this repository.
   через zod. Никаких `process.env.XXX` в разных местах кода.
 
 ## Структура каталогов
-`app/`                     # Next.js App Router
-`api/`                     # API endpoints
-`chat/[id]/`               # Страницы чата
-`generated/prisma/`        # Сгенерированный Prisma Client (в .gitignore)
-`components/`
-`ui/`                      # shadcn/ui компоненты (не править вручную)
-`chat/`                    # Наши компоненты чата
-`lib/`
-`db/`                      # Prisma Client + репозитории
-`ollama/`                  # Клиент Ollama + моки
-`flights/`                 # Клиент Travelpayouts + моки
-`env.ts`                   # Валидация env через zod
-`prisma/`
-`schema.prisma`
-`migrations/`
-`tests/`
-`unit/`                    # Vitest
-`e2e/`                     # Playwright
+- `app/`                     # Next.js App Router
+- `api/`                     # API endpoints
+- `chat/[id]/`               # Страницы чата
+- `generated/prisma/`        # Сгенерированный Prisma Client (в .gitignore)
+- `components/`
+- `ui/`                      # shadcn/ui компоненты (не править вручную)
+- `chat/`                    # Наши компоненты чата
+- `lib/`
+- `db/`                      # Prisma Client + репозитории
+- `ollama/`                  # Клиент Ollama + моки
+- `flights/`                 # Клиент Travelpayouts + моки
+- `env.ts`                   # Валидация env через zod
+- `prisma/`
+- `schema.prisma`
+- `migrations/`
+- `tests/`
+- `unit/`                    # Vitest
+- `e2e/`                     # Playwright
 
 ## Правила написания кода
 
