@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { setEnv, unsetEnv } from '../../utils/env';
 
-const validEnv = {
+const ENV_KEYS = [
+    'NODE_ENV',
+    'DATABASE_URL',
+    'OLLAMA_MODEL',
+    'OLLAMA_MODE',
+    'TRAVELPAYOUTS_TOKEN',
+    'TRAVELPAYOUTS_MARKER',
+    'TRAVELPAYOUTS_MODE',
+] as const;
+
+const validEnv: Record<(typeof ENV_KEYS)[number], string> = {
     NODE_ENV: 'test',
     DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
     OLLAMA_MODEL: 'qwen3.5:cloud',
@@ -11,15 +22,25 @@ const validEnv = {
 };
 
 describe('lib/env', () => {
-    const originalEnv = { ...process.env };
+    const originalValues = new Map<string, string | undefined>();
 
     beforeEach(() => {
         vi.resetModules();
-        process.env = { ...validEnv };
+        for (const key of ENV_KEYS) {
+            originalValues.set(key, process.env[key]);
+            setEnv(key, validEnv[key]);
+        }
     });
 
     afterEach(() => {
-        process.env = { ...originalEnv };
+        for (const [key, value] of originalValues) {
+            if (value === undefined) {
+                unsetEnv(key);
+            } else {
+                setEnv(key, value);
+            }
+        }
+        originalValues.clear();
     });
 
     it('парсит валидные значения', async () => {
@@ -30,12 +51,12 @@ describe('lib/env', () => {
     });
 
     it('кидает ошибку при невалидном DATABASE_URL', async () => {
-        process.env.DATABASE_URL = 'not-a-url';
+        setEnv('DATABASE_URL', 'not-a-url');
         await expect(import('@/lib/env')).rejects.toThrow();
     });
 
     it('использует NODE_ENV=development по умолчанию', async () => {
-        delete process.env.NODE_ENV;
+        unsetEnv('NODE_ENV');
         const { env } = await import('@/lib/env');
         expect(env.NODE_ENV).toBe('development');
     });
