@@ -160,7 +160,8 @@ const prisma = new PrismaClient({ adapter });
 - `import type { User, Chat, Message } from '@/app/generated/prisma/models'` — типы моделей
 - `import { MessageRole } from '@/app/generated/prisma/enums'` — enum'ы
 
-Импорт `from '@/app/generated/prisma'` (без подпути) **не работает**.
+Конвенция репозиториев: в `*.repository.ts` делаем `export type User = UserModel`,
+чтобы наружу шло чистое имя без Prisma-специфичного суффикса.
 
 ### 4. Модели в PascalCase, таблицы в snake_case
 

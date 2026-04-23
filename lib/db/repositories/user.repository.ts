@@ -1,6 +1,8 @@
 import 'server-only';
-import type { User } from '@/app/generated/prisma/models';
+import type { UserModel } from '@/app/generated/prisma/models';
 import { prisma } from '@/lib/db/client';
+
+export type User = UserModel;
 
 export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;
