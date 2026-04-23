@@ -12,6 +12,7 @@ export default defineConfig({
         environment: 'node',
         setupFiles: ['./tests/setup.ts'],
         include: ['tests/unit/**/*.test.ts'],
+        fileParallelism: false,
         coverage: {
             provider: 'v8',
             include: ['lib/**/*.ts'],
