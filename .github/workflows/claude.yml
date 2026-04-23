@@ -69,6 +69,24 @@ jobs:
       - name: Run migrations
         run: npx prisma migrate deploy
 
+      - name: Setup MCP Server
+        run: |
+          mkdir -p /tmp/mcp-config
+          cat > /tmp/mcp-config/mcp-servers.json << 'EOF'
+          {
+          	"mcpServers": {
+          		"playwright": {
+          			"command":"npx",
+          			"args": [
+          				"@playwright/mcp@latest",
+          				"--allowed-origins",
+          				"localhost:3000;cdn.tailwindcss.com;esm.sh"
+          			]
+          		}
+          	}
+          }
+          EOF
+
       - name: Start dev server
         run: |
           npm run dev > logs.txt 2>&1 &
@@ -92,16 +110,7 @@ jobs:
           # or https://code.claude.com/docs/en/cli-reference for available options
           # claude_args: '--allowed-tools Bash(gh pr *)'
           claude_args: |
-            --append-system-prompt "Read CLAUDE.md and AGENTS.md in the repo root before starting any task.\
-              Follow the conventions there strictly: SOLID, DRY, KISS, YAGNI; repository pattern; tests with every new module.\
-              The project is a Russian-language chatbot for searching cheap flights to Sri Lanka (Colombo, CMB).\
-              Stack: Next.js 15, TypeScript, Prisma 7, PostgreSQL, Tailwind v4, shadcn/ui, Ollama via ollama-js, Travelpayouts API.\
-              Dev server runs at localhost:3000. Logs in logs.txt. DB via psql with DATABASE_URL env var.\
-              External services are mocked in CI: OLLAMA_MODE=mock, TRAVELPAYOUTS_MODE=mock.\
-              Use mcp__playwright tools to verify UI changes render correctly.\
-              Work in a branch claude/issue-<num>-<slug>. Do NOT push to main directly.\
-              After finishing the task, ALWAYS open a pull request using `gh pr create` with a link to the issue (Closes #N) and a checklist of acceptance criteria."
             --max-turns 25
             --model claude-opus-4-7
-            --allowedTools "Write,Edit,Read,Bash(npm:*),Bash(npx:*),Bash(psql:*),Bash(git:*),Bash(gh:*),mcp__playwright__browser_navigate,mcp__playwright__browser_click,mcp__playwright__browser_wait_for,mcp__playwright__browser_resize,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_type,mcp__playwright__browser_evaluate,mcp__playwright__browser_press_key,mcp__playwright__browser_snapshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_select_option,mcp__playwright__browser_close,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_tabs"
-            --mcp-config '{"mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest","--allowed-origins","localhost:3000;cdn.tailwindcss.com;esm.sh"]}}}'
+            --allowedTools "Edit,Write,Read,Bash(npm:*),Bash(npx:*),Bash(psql:*),Bash(git:*),Bash(gh:*),mcp__playwright__browser_navigate,mcp__playwright__browser_click,mcp__playwright__browser_wait_for,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_type,mcp__playwright__browser_evaluate,mcp__playwright__browser_press_key,mcp__playwright__browser_snapshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_close,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_tabs"
+            --mcp-config /tmp/mcp-config/mcp-servers.json
