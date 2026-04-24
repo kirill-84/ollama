@@ -6,6 +6,7 @@ const envSchema = z.object({
     DATABASE_URL: z.string().url(),
     OLLAMA_MODEL: z.string().min(1),
     OLLAMA_MODE: z.enum(['real', 'mock']),
+    OLLAMA_HOST: z.string().url().default('http://127.0.0.1:11434'),
     TRAVELPAYOUTS_TOKEN: z.string().min(1),
     TRAVELPAYOUTS_MARKER: z.string().min(1),
     TRAVELPAYOUTS_MODE: z.enum(['real', 'mock']),
