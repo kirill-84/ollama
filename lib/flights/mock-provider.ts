@@ -5,20 +5,21 @@ import {
     type FlightSearchParams,
 } from './types';
 
-/** Генератор «сырых» офферов. Сортировка/фильтрация/лимит — ответственность класса. */
 export type FlightOfferGenerator = (params: FlightSearchParams) => FlightOffer[];
 
-/**
- * Конфигурируемый мок. Генератор отвечает за форму офферов,
- * класс — за инварианты контракта IFlightsProvider.
- *
- * Используется:
- *   1) в юнит-тестах других слоёв — с детерминированным генератором;
- *   2) в dev/CI при TRAVELPAYOUTS_MODE=mock — с генератором из mock-scenarios.ts
- *      (добавим на подшаге 2).
- */
+export interface MockFlightsProviderOptions {
+    /**
+     * Дефолтная валюта. Подставляется в params.currency, если запрос её не задал.
+     * Если options не передан — дефолт берётся из FLIGHT_SEARCH_DEFAULTS в генераторе.
+     */
+    defaultCurrency?: string;
+}
+
 export class MockFlightsProvider implements IFlightsProvider {
-    constructor(private readonly generator: FlightOfferGenerator) {}
+    constructor(
+        private readonly generator: FlightOfferGenerator,
+        private readonly options: MockFlightsProviderOptions = {},
+    ) {}
 
     async search(
         params: FlightSearchParams,
@@ -28,13 +29,17 @@ export class MockFlightsProvider implements IFlightsProvider {
             throw new DOMException('Aborted', 'AbortError');
         }
 
-        const limit = params.limit ?? FLIGHT_SEARCH_DEFAULTS.limit;
-        const maxPrice = params.maxPrice;
+        const effective: FlightSearchParams = {
+            ...params,
+            currency: params.currency ?? this.options.defaultCurrency,
+        };
 
-        const raw = this.generator(params);
-        const filtered = maxPrice === undefined
-            ? raw
-            : raw.filter((o) => o.price <= maxPrice);
+        const limit = effective.limit ?? FLIGHT_SEARCH_DEFAULTS.limit;
+        const maxPrice = effective.maxPrice;
+
+        const raw = this.generator(effective);
+        const filtered =
+            maxPrice === undefined ? raw : raw.filter((o) => o.price <= maxPrice);
 
         return [...filtered].sort((a, b) => a.price - b.price).slice(0, limit);
     }

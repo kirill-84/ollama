@@ -10,6 +10,7 @@ const envSchema = z.object({
     TRAVELPAYOUTS_TOKEN: z.string().min(1),
     TRAVELPAYOUTS_MARKER: z.string().min(1),
     TRAVELPAYOUTS_MODE: z.enum(['real', 'mock']),
+    TRAVELPAYOUTS_CURRENCY: z.string().min(3).max(3).default('RUB')
 });
 
 export type Env = z.infer<typeof envSchema>;

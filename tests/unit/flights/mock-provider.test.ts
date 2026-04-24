@@ -115,4 +115,26 @@ describe('MockFlightsProvider', () => {
         const result = await provider.search({ ...params, maxPrice: 10000 });
         expect(result).toEqual([]);
     });
+
+    it('подставляет defaultCurrency из options, если params.currency не задан', async () => {
+        const generator = vi.fn(() => [offer(50000)]);
+        const provider = new MockFlightsProvider(generator, { defaultCurrency: 'USD' });
+
+        await provider.search(params);
+
+        expect(generator).toHaveBeenCalledWith(
+            expect.objectContaining({ currency: 'USD' }),
+        );
+    });
+
+    it('params.currency имеет приоритет над defaultCurrency', async () => {
+        const generator = vi.fn(() => [offer(50000)]);
+        const provider = new MockFlightsProvider(generator, { defaultCurrency: 'USD' });
+
+        await provider.search({ ...params, currency: 'EUR' });
+
+        expect(generator).toHaveBeenCalledWith(
+            expect.objectContaining({ currency: 'EUR' }),
+        );
+    });
 });
