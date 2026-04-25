@@ -1,18 +1,14 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working
-with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 @AGENTS.md
 
 ## Проект
 
-Русскоязычный чат-бот для поиска дешёвых авиабилетов на Шри-Ланку
-(аэропорт Коломбо, IATA: CMB) с заданным фильтром по цене.
+Русскоязычный чат-бот для поиска дешёвых авиабилетов на Шри-Ланку (аэропорт Коломбо, IATA: CMB) с заданным фильтром по цене.
 
-Бот строго удерживается в рамках темы: авиабилеты, направления, даты,
-цены, практическая информация о перелётах. На off-topic вопросы
-(погода, рецепты, общие знания) — вежливый отказ и возврат к теме.
+Бот строго удерживается в рамках темы: авиабилеты, направления, даты, цены, практическая информация о перелётах. На off-topic вопросы (погода, рецепты, общие знания) — вежливый отказ и возврат к теме.
 
 ## Технологический стек
 
@@ -30,14 +26,10 @@ with code in this repository.
 
 - **SOLID, DRY, KISS, YAGNI** — соблюдаем строго, без компромиссов.
 - **Repository pattern** — все обращения к БД через репозитории
-  (`UserRepository`, `ChatRepository`, `MessageRepository`), никаких
-  прямых вызовов `prisma.*` из API-роутов или компонентов.
-- **Все внешние интеграции — за интерфейсами.** Ollama и Travelpayouts
-  имеют интерфейсы (`IChatProvider`, `IFlightsProvider`) и реальные
-  реализации + мок-реализации для тестов и CI.
+  (`UserRepository`, `ChatRepository`, `MessageRepository`), никаких прямых вызовов `prisma.*` из API-роутов или компонентов.
+- **Все внешние интеграции — за интерфейсами.** Ollama и Travelpayouts имеют интерфейсы (`IChatProvider`, `IFlightsProvider`) и реальные реализации + мок-реализации для тестов и CI.
 - **SRP на уровне файлов.** Один файл — одна ответственность.
-- **Env-переменные через единый модуль `lib/env.ts`** с валидацией
-  через zod. Никаких `process.env.XXX` в разных местах кода.
+- **Env-переменные через единый модуль `lib/env.ts`** с валидацией через zod. Никаких `process.env.XXX` в разных местах кода.
 
 ## Структура каталогов
 - `app/`                     # Next.js App Router
@@ -61,12 +53,9 @@ with code in this repository.
 
 ## Правила написания кода
 
-- **TypeScript strict.** `any` запрещён. Если нужна широкая типизация —
-  `unknown` + narrowing.
-- **Именование.** PascalCase для типов, классов, компонентов. camelCase
-  для функций и переменных. kebab-case для имён файлов.
-- **Prisma-модели** — PascalCase в коде (`prisma.user`), snake_case
-  в БД через `@@map`.
+- **TypeScript strict.** `any` запрещён. Если нужна широкая типизация — `unknown` + narrowing.
+- **Именование.** PascalCase для типов, классов, компонентов. camelCase для функций и переменных. kebab-case для имён файлов.
+- **Prisma-модели** — PascalCase в коде (`prisma.user`), snake_case в БД через `@@map`.
 - **Без комментариев-шума.** Комментарий пишем только когда объясняет
   *почему*, а не *что*.
 - **Никаких inline-стилей.** Только Tailwind-классы.
@@ -74,27 +63,20 @@ with code in this repository.
 ## Тесты
 
 - **Каждый новый модуль — с тестами в том же коммите.** Без исключений.
-- **Юнит-тесты репозиториев** работают против реальной тестовой БД
-  (`chatbot_test` в CI), не против моков.
-- **Тесты API** — на мок-реализациях Ollama и Travelpayouts
-  (`OLLAMA_MODE=mock`, `TRAVELPAYOUTS_MODE=mock`).
-- **E2E через Playwright** — покрывают ключевые сценарии: создать чат,
-  отправить сообщение, получить ответ с билетами, отказ на off-topic.
+- **Юнит-тесты репозиториев** работают против реальной тестовой БД (`chatbot_test` в CI), не против моков.
+- **Тесты API** — на мок-реализациях Ollama и Travelpayouts (`OLLAMA_MODE=mock`, `TRAVELPAYOUTS_MODE=mock`).
+- **E2E через Playwright** — покрывают ключевые сценарии: создать чат, отправить сообщение, получить ответ с билетами, отказ на off-topic.
 
 ## Чего НЕ делать
 
 - Не коммитить `.env` и любые секреты.
 - Не ставить новые npm-зависимости без явного запроса в задаче.
-- Не трогать папку `components/ui/` вручную — это shadcn, обновляется
-  через `npx shadcn add`.
+- Не трогать папку `components/ui/` вручную — это shadcn, обновляется через `npx shadcn add`.
 - Не писать код без тестов.
 - Не использовать `any` в TypeScript.
-- Не обращаться к Prisma Client напрямую из API-роутов — только через
-  репозитории.
-- Не менять `schema.prisma` без создания миграции через
-  `npx prisma migrate dev --name <осмысленное_имя>`.
-- Не расширять функциональность за пределы темы «поиск авиабилетов
-  на Шри-Ланку». YAGNI.
+- Не обращаться к Prisma Client напрямую из API-роутов — только через репозитории.
+- Не менять `schema.prisma` без создания миграции через `npx prisma migrate dev --name <осмысленное_имя>`.
+- Не расширять функциональность за пределы темы «поиск авиабилетов на Шри-Ланку». YAGNI.
 
 ## Переменные окружения
 
@@ -119,9 +101,7 @@ with code in this repository.
 
 ## Key Constraints — Prisma 7
 
-У проекта **Prisma 7 с новым runtime** (`provider = "prisma-client"` в
-`schema.prisma`). Это важно, потому что поведение отличается от Prisma
-5/6, и большинство туториалов в интернете устарели. Конкретные правила:
+У проекта **Prisma 7 с новым runtime** (`provider = "prisma-client"` в `schema.prisma`). Это важно, потому что поведение отличается от Prisma 5/6, и большинство туториалов в интернете устарели. Конкретные правила:
 
 ### 1. URL подключения — только в `prisma.config.ts`
 
@@ -137,8 +117,7 @@ URL читается из `.env` через `dotenv/config` в `prisma.config.ts
 
 ### 2. Конструктор клиента — через adapter, не через `datasourceUrl`
 
-Параметры `datasourceUrl` и `datasources` в Prisma 7 удалены. URL
-передаётся через driver adapter:
+Параметры `datasourceUrl` и `datasources` в Prisma 7 удалены. URL передаётся через driver adapter:
 
 ```ts
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -148,8 +127,7 @@ const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 ```
 
-Любая попытка использовать `datasourceUrl` или `datasources` приводит
-к ошибке `Unknown property ... provided to PrismaClient constructor`.
+Любая попытка использовать `datasourceUrl` или `datasources` приводит к ошибке `Unknown property ... provided to PrismaClient constructor`.
 
 ### 3. Импорт клиента — не из корня, а из `/client`
 
@@ -180,14 +158,12 @@ await prisma.message.findMany(...)  // НЕ prisma.messages
 Модули, импортирующие `server-only` (напр. `lib/env.ts`, `lib/db/client.ts`),
 **не могут быть импортированы** из client-компонентов. Это защита Next.js.
 
-В Vitest `server-only` замокан пустым модулем через `resolve.alias`
-в `vitest.config.ts`. Это работает из коробки, трогать не надо.
+В Vitest `server-only` замокан пустым модулем через `resolve.alias` в `vitest.config.ts`. Это работает из коробки, трогать не надо.
 
 ### 6. Переменные окружения в тестах
 
-Vitest не читает `.env` автоматически. Это делает `tests/setup.ts`
-через `import 'dotenv/config'`. Любой тест, обращающийся к `env`,
-требует корректных значений в `.env`.
+Vitest не читает `.env` автоматически. Это делает `tests/setup.ts` через `import 'dotenv/config'`. 
+Любой тест, обращающийся к `env`, требует корректных значений в `.env`.
 
 ## Key Constraints — Next.js
 
