@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Бот строго удерживается в рамках темы: авиабилеты, направления, даты, цены, практическая информация о перелётах. На off-topic вопросы (погода, рецепты, общие знания) — вежливый отказ и возврат к теме.
 
-Текущий скоуп фиксируется в этом файле и в системном промпте бота (когда появится — `lib/chat/`). При расширении продукта оба обновляются синхронно.
+Текущий скоуп фиксируется в этом файле и в системном промпте бота (`lib/chat/system-prompt.ts`). Системный промпт параметризуется списком направлений (`buildSystemPrompt({ destinations: [...] })`) — расширение скоупа продукта обновляет конфиг, а не код. При расширении этот файл и конфиг направлений обновляются синхронно.
 
 ## Технологический стек
 
@@ -18,7 +18,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Prisma 7** + PostgreSQL 16
 - **Tailwind CSS v4** (через `@tailwindcss/postcss`) + **shadcn/ui**
 - **Ollama** (через npm-пакет `ollama`) — модель задаётся через env `OLLAMA_MODEL`
-- **Travelpayouts API** — источник данных о билетах
+- **Travelpayouts API** — источник данных о билетах (real-провайдер не реализован до получения ключа, работаем в `mock`)
+- **Zod v4** — валидация env и tool-аргументов. JSON Schema из zod-схем — через встроенный `z.toJSONSchema`. Внешний `zod-to-json-schema` НЕ ставим — несовместим с zod v4.
 - **Vitest** — юнит- и интеграционные тесты
 - **Playwright** (через MCP) — e2e-тесты
 - Шрифт Geist через `next/font/google`
@@ -27,6 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Архитектурные принципы
 
 - **SOLID, DRY, KISS, YAGNI** — соблюдаем строго, без компромиссов.
+- **DIP** — API-роуты и оркестратор зависят от интерфейсов (`IChatProvider`, `IFlightsProvider`), не от конкретных реализаций. Реализации поднимаются через фабрики из `lib/env.ts`.
 - **Repository pattern** — все обращения к БД через репозитории
   (`UserRepository`, `ChatRepository`, `MessageRepository`), никаких прямых вызовов `prisma.*` из API-роутов или компонентов.
 - **Все внешние интеграции — за интерфейсами.** Ollama и Travelpayouts имеют интерфейсы (`IChatProvider`, `IFlightsProvider`) и реальные реализации + мок-реализации для тестов и CI.
@@ -43,8 +45,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `chat/`                    # Наши компоненты чата
 - `lib/`
 - `db/`                      # Prisma Client + репозитории
-- `ollama/`                  # Клиент Ollama + моки
-- `flights/`                 # Клиент Travelpayouts + моки
+- `ollama/`                  # IChatProvider + Ollama- и Mock-реализации
+- `flights/`                 # IFlightsProvider + Mock-реализация
+- `chat/`                    # Системный промпт + search_flights tool
 - `env.ts`                   # Валидация env через zod
 - `prisma/`
 - `schema.prisma`
@@ -52,10 +55,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `tests/`
 - `unit/`                    # Vitest
 - `e2e/`                     # Playwright
+- `setup.ts`                 # dotenv/config
+- `utils/env.ts`             # setEnv/unsetEnv
+- `stubs/server-only.ts`
+
+## Что уже реализовано
+
+Все слои покрыты тестами, тесты идут вместе с кодом в одном коммите. Состояние на момент завершения шага 3: ~98 зелёных юнит-тестов.
+
+### `lib/env.ts`
+zod-валидация env, синглтон, `server-only`. Поля: см. раздел «Переменные окружения».
+
+### `lib/db/`
+PrismaClient singleton через `PrismaPg` adapter. Репозитории `UserRepository`, `ChatRepository`, `MessageRepository` (паттерн: интерфейс + класс + singleton). Конвенция: `export type User = UserModel` для очищения Prisma-суффиксов. Каскады `User → Chat → Message`. Индексы: `idx_chats_user_updated`, `idx_messages_chat_created`. Enum `MessageRole` (`system`, `user`, `assistant`, `tool`).
+
+### `lib/ollama/`
+Контракт `IChatProvider { chat(req): Promise<ChatResponse> }`. Non-streaming в v1 (streaming откладываем до UI отдельным `IStreamingChatProvider`). Tool-calling заложен в контракт: `ChatMessage.toolCalls`, `ToolDefinition` в `ChatRequest`. ID tool-вызовов синтетические (`call_0`, `call_1`, ...) — `ollama-js` их не отдаёт.
+
+Реализации:
+- `OllamaChatProvider` поверх `ollama-js`. Гибридная стратегия клиента: shared-инстанс для запросов без `AbortSignal` (нулевой overhead), изолированный инстанс на каждый запрос с `signal` (`ollama.abort()` грохает все активные запросы клиента — изоляция обязательна).
+- `MockChatProvider` — список правил `{ match, respond }` + fallback. `respond` — функция, не значение (stateful-ответы через замыкание + инспекция запроса).
+
+Фабрика `createChatProvider(config)` + lazy singleton `getChatProvider()`. Публичная поверхность barrel-а: `IChatProvider`, типы, `createChatProvider`, `getChatProvider`. Mock/Ollama-реализации, мапперы, сценарии — внутренние.
+
+### `lib/flights/`
+Контракт `IFlightsProvider { search(params, signal?): Promise<FlightOffer[]> }`. Задокументированные инварианты: результат отсортирован по `price ASC`; `maxPrice` отсекает дороже; размер ≤ `limit` (default 5); aborted signal → `AbortError` без HTTP-запросов.
+
+Ключевые решения:
+- `FlightSearchParams.destination` — параметр, не хардкод. Удержание скоупа — работа системного промпта, не инфраструктуры.
+- `FlexibleDate.flexDays` описывает намерение пользователя. Travelpayouts диапазон не умеет — real-провайдер при появлении будет делать `2·flex+1` параллельных запросов и склеивать. Для мока проблемы нет.
+- Round-trip — одно вложенное `FlightOffer` с полями `outbound` и `return` (тип `FlightSegment` переиспользуется), одна цена за пару, не два отдельных оффера.
+- Сортировка всегда `price ASC`, без `sortBy`. Соответствует позиционированию «дешёвые авиабилеты».
+- `FLIGHT_SEARCH_DEFAULTS = { passengers: 1, currency: 'RUB', limit: 5 }` — fallback контракта в коде; `TRAVELPAYOUTS_CURRENCY` в env — для переключения валюты в одном месте на уровне инстанса провайдера.
+
+Реализации:
+- `MockFlightsProvider` — инварианты контракта (сортировка/фильтрация/лимит) живут в КЛАССЕ, не в генераторе. Это LSP: любой генератор автоматически получает корректное поведение. `defaultCurrency` подставляется в `params.currency`, если запрос её не задал.
+- `defaultMockGenerator` — 6 шаблонов рейсов (SU/TK/QR/EK/S7/EK2), цены 42–72k RUB, пересадки 0/1/2. Раскладывает шаблоны на все даты в пределах `flexDays`. Умножает цену на `passengers` и на 2 для round-trip.
+
+Фабрика: `createFlightsProvider(config)`. `mode='real'` сейчас кидает Error с инструкцией переключиться в `mock` (TravelpayoutsFlightsProvider не реализован до получения ключа). При появлении ключа добавится `travelpayouts-provider.ts` и case `'real'` заменится на `new TravelpayoutsFlightsProvider(...)`. `getFlightsProvider()` — lazy singleton поверх env, пробрасывает `TRAVELPAYOUTS_CURRENCY` как `defaultCurrency`.
+
+### `lib/chat/`
+- `buildSystemPrompt({ destinations, now? })` — системный промпт, параметризованный по списку направлений и текущей дате (для разрешения относительных дат типа «в мае»). Off-topic фильтр статичен и от скоупа не зависит — он есть всегда.
+- `searchFlightsTool: ToolDefinition` — JSON Schema инструмента получается из zod-схемы через `z.toJSONSchema(schema, { target: 'openapi-3.0' })`. Tool-args — подмножество `FlightSearchParams` (без `currency` и `limit` — это системные настройки, модель их не указывает).
+- `parseSearchFlightsArguments(raw): ParseResult<...>` — `safeParse` → discriminated result, без эксепшенов на ожидаемые сценарии. Модель регулярно ошибается в аргументах — это штатный control flow tool-loop, а не баг.
+- `executeSearchFlights(toolCall, deps)` — total-функция, всегда возвращает `ChatMessage` role='tool'. Формат content (JSON-конверт): `{ count, currency, priceRange, offers }`. Ошибки провайдера заворачиваются в `{ error: 'provider', message }`. `AbortError` пробрасывается наружу.
 
 ## Правила написания кода
 
 - **TypeScript strict.** `any` запрещён. Если нужна широкая типизация — `unknown` + narrowing.
+- **Импорт типов** — `import type { ... }` для type-only имён. При `verbatimModuleSyntax` обычный импорт типа ломает сборку.
 - **Именование.** PascalCase для типов, классов, компонентов. camelCase для функций и переменных. kebab-case для имён файлов.
 - **Prisma-модели** — PascalCase в коде (`prisma.user`), snake_case в БД через `@@map`.
 - **Без комментариев-шума.** Комментарий пишем только когда объясняет
@@ -66,6 +114,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Каждый новый модуль — с тестами в том же коммите.** Без исключений.
 - **Юнит-тесты репозиториев** работают против реальной тестовой БД (`chatbot_test` в CI), не против моков.
+- **`vitest.config.ts`:** `fileParallelism: false` (тесты идут последовательно — важно для БД), `vite-tsconfig-paths` для path-алиасов, stub `server-only` через `resolve.alias`.
+- **`tests/setup.ts`** — `import 'dotenv/config'`. Vitest не читает `.env` автоматически.
 - **Тесты API** — на мок-реализациях Ollama и Travelpayouts (`OLLAMA_MODE=mock`, `TRAVELPAYOUTS_MODE=mock`).
 - **E2E через Playwright** — покрывают ключевые сценарии: создать чат, отправить сообщение, получить ответ с билетами, отказ на off-topic.
 
@@ -73,7 +123,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Не коммитить `.env` и любые секреты.
 - Не ставить новые npm-зависимости без явного запроса в задаче.
+- Не ставить `zod-to-json-schema` — несовместим с zod v4. Использовать встроенный `z.toJSONSchema`.
 - Не трогать папку `components/ui/` вручную — это shadcn, обновляется через `npx shadcn add`.
+- Не трогать `app/generated/prisma/` — генерируется автоматически.
 - Не писать код без тестов.
 - Не использовать `any` в TypeScript.
 - Не обращаться к Prisma Client напрямую из API-роутов — только через репозитории.
@@ -83,7 +135,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Переменные окружения
 
-Все переменные валидируются в `lib/env.ts` через zod при импорте модуля (fail-fast). В рантайме читаются только из `.env`. 
+Все переменные валидируются в `lib/env.ts` через zod при импорте модуля (fail-fast). В рантайме читаются только из `.env`.
 Канонический справочник формы (что обязательно, что опционально, какие дефолты) — `.env.example` в корне репо.
 
 **Обязательные** (zod-схема без `.default(...)`):
@@ -121,12 +173,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev` — запуск dev-сервера (localhost:3000).
 - `npm run build` — продакшен-сборка.
 - `npm run start` — продакшен-сервер.
-- `npm run lint` — ESLint (Next.js core-web-vitals + TypeScript).
-- `npm test` — юнит-тесты (Vitest).
+- `npm run lint` — ESLint напрямую (`eslint .`). В Next.js 16 команда `next lint` удалена, поэтому скрипт не оборачивает её.
+- `npm test` — юнит-тесты (Vitest), эквивалент `vitest run`.
+- `npm run test:watch` — Vitest в watch-режиме.
+- `npm run test:coverage` — Vitest с покрытием (`vitest run --coverage`).
 - `npm run test:e2e` — e2e-тесты (Playwright).
+- `npx tsc --noEmit` — проверка типов без эмита. Vitest проверяет только синтаксис (через esbuild), типы — задача `tsc`.
 - `npx prisma migrate dev --name X` — новая миграция локально.
 - `npx prisma migrate deploy` — применить миграции в CI/prod.
 - `npx prisma studio` — GUI для БД.
+
+**Стандартный цикл проверки перед коммитом:**
+
+```bash
+npx tsc --noEmit && npm run lint && npm test
+```
 
 ## Key Constraints — Prisma 7
 
@@ -191,13 +252,14 @@ await prisma.message.findMany(...)  // НЕ prisma.messages
 
 ### 6. Переменные окружения в тестах
 
-Vitest не читает `.env` автоматически. Это делает `tests/setup.ts` через `import 'dotenv/config'`. 
+Vitest не читает `.env` автоматически. Это делает `tests/setup.ts` через `import 'dotenv/config'`.
 Любой тест, обращающийся к `env`, требует корректных значений в `.env`.
 
-## Key Constraints — Next.js
+## Key Constraints — Next.js 16
 
-- **Next.js 16** — APIs and conventions may differ from earlier versions.
-  Read `node_modules/next/dist/docs/` before using unfamiliar APIs.
+- **APIs and conventions могут отличаться** от ранних версий. Перед использованием незнакомых API — читать `node_modules/next/dist/docs/`.
+- **`next lint` удалена.** Скрипт `lint` в `package.json` вызывает `eslint .` напрямую. Конфиг — `eslint.config.mjs` (flat config, `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`).
+- **`process.env.NODE_ENV` типизирован readonly** — в тестах используем утилиты `setEnv`/`unsetEnv` из `tests/utils/env.ts`.
 
 ## Key Constraints — Ollama
 
