@@ -65,6 +65,44 @@ describe('MessageRepository', () => {
         expect(tool.role).toBe(MessageRole.tool);
     });
 
+    it('create по умолчанию пишет null в toolCallId и toolName', async () => {
+        const message = await messageRepository.create({
+            chatId,
+            role: MessageRole.user,
+            content: 'Привет',
+        });
+
+        expect(message.toolCallId).toBeNull();
+        expect(message.toolName).toBeNull();
+    });
+
+    it('create сохраняет toolCallId и toolName для tool-сообщения', async () => {
+        const message = await messageRepository.create({
+            chatId,
+            role: MessageRole.tool,
+            content: '{"count":0,"offers":[]}',
+            toolCallId: 'call_0',
+            toolName: 'search_flights',
+        });
+
+        expect(message.toolCallId).toBe('call_0');
+        expect(message.toolName).toBe('search_flights');
+    });
+
+    it('listByChatId возвращает toolCallId и toolName в записях', async () => {
+        await messageRepository.create({
+            chatId,
+            role: MessageRole.tool,
+            content: '{"count":1}',
+            toolCallId: 'call_42',
+            toolName: 'search_flights',
+        });
+
+        const [stored] = await messageRepository.listByChatId(chatId);
+        expect(stored.toolCallId).toBe('call_42');
+        expect(stored.toolName).toBe('search_flights');
+    });
+
     it('listByChatId возвращает сообщения в порядке createdAt ASC', async () => {
         const a = await messageRepository.create({
             chatId,

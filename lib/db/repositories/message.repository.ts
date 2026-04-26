@@ -6,12 +6,16 @@ import { prisma } from '@/lib/db/client';
 export type Message = MessageModel;
 export { MessageRole };
 
+export type CreateMessageInput = {
+    chatId: string;
+    role: MessageRole;
+    content: string;
+    toolCallId?: string | null;
+    toolName?: string | null;
+};
+
 export interface IMessageRepository {
-    create(data: {
-        chatId: string;
-        role: MessageRole;
-        content: string;
-    }): Promise<Message>;
+    create(data: CreateMessageInput): Promise<Message>;
 
     listByChatId(chatId: string): Promise<Message[]>;
 
@@ -19,11 +23,7 @@ export interface IMessageRepository {
 }
 
 export class MessageRepository implements IMessageRepository {
-    async create(data: {
-        chatId: string;
-        role: MessageRole;
-        content: string;
-    }): Promise<Message> {
+    async create(data: CreateMessageInput): Promise<Message> {
         return prisma.message.create({ data });
     }
 
