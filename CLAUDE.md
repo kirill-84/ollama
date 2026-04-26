@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Архитектурные принципы
 
 - **SOLID, DRY, KISS, YAGNI** — соблюдаем строго, без компромиссов.
-- **DIP** — API-роуты и оркестратор зависят от интерфейсов (`IChatProvider`, `IFlightsProvider`), не от конкретных реализаций. Реализации поднимаются через фабрики из `lib/env.ts`.
+- **DIP** — API-роуты и оркестратор зависят от интерфейсов (`IChatProvider`, `IFlightsProvider`), не от конкретных реализаций. Реализации поднимаются через lazy-фабрики (`getChatProvider()`, `getFlightsProvider()`) поверх конфига из `lib/env.ts`.
 - **Repository pattern** — все обращения к БД через репозитории
   (`UserRepository`, `ChatRepository`, `MessageRepository`), никаких прямых вызовов `prisma.*` из API-роутов или компонентов.
 - **Все внешние интеграции — за интерфейсами.** Ollama и Travelpayouts имеют интерфейсы (`IChatProvider`, `IFlightsProvider`) и реальные реализации + мок-реализации для тестов и CI.
