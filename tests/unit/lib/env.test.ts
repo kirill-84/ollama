@@ -9,6 +9,7 @@ const ENV_KEYS = [
     'TRAVELPAYOUTS_TOKEN',
     'TRAVELPAYOUTS_MARKER',
     'TRAVELPAYOUTS_MODE',
+    'MVP_USER_EMAIL',
 ] as const;
 
 const validEnv: Record<(typeof ENV_KEYS)[number], string> = {
@@ -19,6 +20,7 @@ const validEnv: Record<(typeof ENV_KEYS)[number], string> = {
     TRAVELPAYOUTS_TOKEN: 'token',
     TRAVELPAYOUTS_MARKER: 'marker',
     TRAVELPAYOUTS_MODE: 'mock',
+    MVP_USER_EMAIL: 'mvp@example.com',
 };
 
 describe('lib/env', () => {
@@ -59,5 +61,15 @@ describe('lib/env', () => {
         unsetEnv('NODE_ENV');
         const { env } = await import('@/lib/env');
         expect(env.NODE_ENV).toBe('development');
+    });
+
+    it('требует MVP_USER_EMAIL', async () => {
+        unsetEnv('MVP_USER_EMAIL');
+        await expect(import('@/lib/env')).rejects.toThrow();
+    });
+
+    it('кидает ошибку при невалидном MVP_USER_EMAIL', async () => {
+        setEnv('MVP_USER_EMAIL', 'not-an-email');
+        await expect(import('@/lib/env')).rejects.toThrow();
     });
 });
