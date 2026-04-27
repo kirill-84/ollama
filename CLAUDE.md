@@ -37,17 +37,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Структура каталогов
 - `app/`                     # Next.js App Router
-- `api/`                     # API endpoints
+- `api/chats/`               # POST/GET список чатов
+- `api/chats/[id]/messages/` # POST (tool-loop) + GET истории
 - `chat/[id]/`               # Страницы чата
 - `generated/prisma/`        # Сгенерированный Prisma Client (в .gitignore)
 - `components/`
 - `ui/`                      # shadcn/ui компоненты (не править вручную)
 - `chat/`                    # Наши компоненты чата
 - `lib/`
+- `api/`                     # withApiHandler + кастомные ошибки
+- `auth/`                    # getCurrentUser (MVP, lazy upsert)
 - `db/`                      # Prisma Client + репозитории
 - `ollama/`                  # IChatProvider + Ollama- и Mock-реализации
 - `flights/`                 # IFlightsProvider + Mock-реализация
-- `chat/`                    # Системный промпт + search_flights tool
+- `chat/`                    # Системный промпт + search_flights tool + tool-loop оркестратор
 - `env.ts`                   # Валидация env через zod
 - `prisma/`
 - `schema.prisma`
@@ -61,7 +64,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Что уже реализовано
 
-Все слои покрыты тестами, тесты идут вместе с кодом в одном коммите. Состояние на момент завершения шага 3: ~98 зелёных юнит-тестов.
+Все слои покрыты тестами, тесты идут вместе с кодом в одном коммите. Состояние на момент завершения шага 4: ~153 зелёных юнит-теста, четыре API-роута (POST/GET `/api/chats`, POST/GET `/api/chats/[id]/messages`).
 
 ### `lib/env.ts`
 zod-валидация env, синглтон, `server-only`. Поля: см. раздел «Переменные окружения».
@@ -96,9 +99,24 @@ PrismaClient singleton через `PrismaPg` adapter. Репозитории `Us
 
 ### `lib/chat/`
 - `buildSystemPrompt({ destinations, now? })` — системный промпт, параметризованный по списку направлений и текущей дате (для разрешения относительных дат типа «в мае»). Off-topic фильтр статичен и от скоупа не зависит — он есть всегда.
+- `MVP_DESTINATIONS` — единый источник списка направлений MVP (сейчас только `Коломбо/CMB`). Расширение скоупа — обновление этого массива и CLAUDE.md в одном коммите.
 - `searchFlightsTool: ToolDefinition` — JSON Schema инструмента получается из zod-схемы через `z.toJSONSchema(schema, { target: 'openapi-3.0' })`. Tool-args — подмножество `FlightSearchParams` (без `currency` и `limit` — это системные настройки, модель их не указывает).
 - `parseSearchFlightsArguments(raw): ParseResult<...>` — `safeParse` → discriminated result, без эксепшенов на ожидаемые сценарии. Модель регулярно ошибается в аргументах — это штатный control flow tool-loop, а не баг.
 - `executeSearchFlights(toolCall, deps)` — total-функция, всегда возвращает `ChatMessage` role='tool'. Формат content (JSON-конверт): `{ count, currency, priceRange, offers }`. Ошибки провайдера заворачиваются в `{ error: 'provider', message }`. `AbortError` пробрасывается наружу.
+- `runChatTurn({ messages, chatProvider, flightsProvider, tools, signal, maxIterations? })` — tool-loop оркестратор. Прокручивает диалог `chatProvider → executeSearchFlights → chatProvider` до финального assistant без `toolCalls`. `MAX_TOOL_ITERATIONS = 5`, при превышении возвращает накопленный след + assistant-fallback. `AbortSignal` пробрасывается насквозь — отмена клиента моментально останавливает и `chat`, и tool-вызовы. Возвращает только новые сообщения turn-а (без исходного user).
+
+### `lib/auth/`
+- `getCurrentUser(): Promise<User>` — единственная точка получения текущего пользователя. MVP-схема: `userRepository.findByEmail(env.MVP_USER_EMAIL)` + lazy create при первом запросе. Когда появится настоящая авторизация, меняется только эта функция.
+
+### `lib/api/`
+- `withApiHandler(handler)` — обёртка для App Router-роутов. Маппит `ZodError → 400 { error: 'validation', issues }`, `NotFoundError → 404`, `ValidationError → 400`, `ForbiddenError → 403`. `AbortError` пробрасывается наверх (Next закрывает соединение). Прочие ошибки → 500 + `console.error`.
+- `errors.ts` — `NotFoundError`, `ValidationError`, `ForbiddenError`. Несут поле `statusCode`. Для «не существует / чужой» используем `NotFoundError` (а не `ForbiddenError`), чтобы не палить факт существования чужого ресурса.
+
+### `app/api/chats/`
+- `POST /api/chats` — создаёт чат под текущим MVP-пользователем (поле `model = env.OLLAMA_MODEL`, `title` опционален, валидация Zod, max 200). 201 + `{ id, title, updatedAt }`.
+- `GET /api/chats` — список чатов пользователя по `updatedAt DESC`. `{ chats: Array<{ id, title, updatedAt }> }`.
+- `POST /api/chats/[id]/messages` — главный chat-эндпоинт. Записывает user-сообщение, поднимает всю историю, подмешивает system-prompt, прогоняет `runChatTurn` и сохраняет весь след turn-а: assistant с tool_calls (`content = JSON.stringify(toolCalls)`, `tool_name = '__tool_calls__'` — sentinel), tool-result, финальный assistant. Записи делаются последовательно, чтобы `createdAt` оставался монотонным. Ответ: `{ message: <финальный assistant> }`. Чужой/несуществующий чат → 404.
+- `GET /api/chats/[id]/messages` — история, видимая UI. Фильтрует `tool` и assistant с `tool_name === '__tool_calls__'`, оставляет только `user`/`assistant` с человекочитаемым текстом. Чужой/несуществующий чат → 404.
 
 ## Правила написания кода
 
@@ -152,6 +170,10 @@ PrismaClient singleton через `PrismaPg` adapter. Репозитории `Us
   пока не реализован `TravelpayoutsFlightsProvider`. При `real` фабрика
   `lib/flights/factory.ts` бросает Error с инструкцией переключиться
   в `mock`.
+* `MVP_USER_EMAIL` — email текущего пользователя для MVP-режима без
+  авторизации. `getCurrentUser()` делает по нему `findByEmail` + lazy
+  upsert, поэтому email должен быть валидным форматом. Меняется только
+  при появлении настоящего auth-слоя.
 
 **Опциональные** (zod-схема с `.default(...)`):
 
